@@ -74,6 +74,12 @@ def get_hypothyroid_data():
     data = np.loadtxt("hypothyroid.csv", delimiter=",", dtype=str)
     x = data[1:, :-1]
     y = data[1:, -1]
+    # remove unrelevent column
+    x = np.delete(x, 27, 1)
+    # Remove the rows that contain '?'
+    conditionUndifined = np.any(x == '?', axis=1)
+    x = x[~conditionUndifined]
+    
     return (normalize_data(x), normalize_data(y))
 
 
@@ -94,4 +100,4 @@ def get_trash_column(x):
 
 
 if __name__ == "__main__":
-    print(get_heart_data())
+    get_hypothyroid_data()
