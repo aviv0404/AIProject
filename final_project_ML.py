@@ -2,16 +2,24 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.multiclass import OneVsOneClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report
-from sklearn.model_selection import GridSearchCV
 from tabulate import tabulate
 import numpy as np
 import csv
+import random
+import matplotlib.pyplot as plt
+from sklearn.mixture import GaussianMixture
+from sklearn.metrics import accuracy_score
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.neighbors import KNeighborsClassifier
 
 
-# This function sorts diabetes only once, since there are 
+# This function sorts diabetes only once, since there are about 210 thousand lines
+# of healthy people without diabetes (class 0), and only about 20k of class 2 and 3k of class 1
+# This function should only be executed once, it outputs a new file sorted by the classes, and another file with indexes of where each class starts
+# We do this to save in runtime, you don't need to run this function as we've provided you with the files.
 def sort_diabetes_once():
     data = np.loadtxt("diabetes.csv", delimiter=",", dtype=str)
-    
+
     sorted_indices = np.argsort(data[:, 0])[::-1]
 
     # Sort the matrix based on the sorted indices
@@ -19,19 +27,33 @@ def sort_diabetes_once():
 
     # Specify the output CSV file path
     output_file = "diabetes_sorted.csv"
+    out_index = "diabetes_sorted_index.txt"
 
     # Write the sorted matrix to a CSV file
     with open(output_file, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerows(sorted_matrix)
-    
+    ind = [np.count_nonzero(sorted_matrix[:, 0] == '2.0'), np.count_nonzero(
+        sorted_matrix[:, 0] == '2.0')+np.count_nonzero(sorted_matrix[:, 0] == '1.0')]
+    print(ind)
+    with open(out_index, 'w') as file:
+        file.write(str(ind[0]) + '\n'+str(ind))
+    return ind
+
 
 def get_diabetes_data():
-    # get only a portion of the data, remove top row of column names
-    data = np.loadtxt("diabetes.csv", delimiter=",", dtype=str)
+    data = np.loadtxt("diabetes_sorted.csv", delimiter=",", dtype=str)
     num_rows = np.shape(data)[0]
-    random_indices = np.random.choice(num_rows, size=500, replace=False)
-    data = data[random_indices]
+    indexs = []
+    # Get 3000 of random from class 0, 1000 of random class 1, and 1000 of random class 2.
+    # This is fine because in reality there are more healthy people than people in class 1 or 2
+    with open('diabetes_sorted_index.txt', 'r') as file:
+        indexs = [line.strip() for line in file.readlines()]
+    for i in range(len(indexs)):
+        indexs[i] = int(indexs[i])
+    class2, class1, class0 = data[np.array(random.sample([*range(1, indexs[0])], 4500))], data[np.array(random.sample(
+        [*range(indexs[0]+1, indexs[1])], 4500))], data[np.array(random.sample([*range(indexs[1], num_rows)], 4500))]
+    data = np.concatenate((data[0:1,], class2, class1, class0), axis=0)
 
     x = data[1:, 1:]
     x = x.astype(float)
@@ -111,6 +133,7 @@ def get_hypothyroid_data():
     # Remove the rows that contain '?'
     conditionUndifined = np.any(x == "?", axis=1)
     x = x[~conditionUndifined]
+    y = y[~conditionUndifined]
 
     # let's see which columns need reformatting:
     # print_unique_values_per_col(x) # uncomment to see
@@ -159,8 +182,9 @@ def get_stroke_data():
     # print_unique_values_per_col(x)
     conditionUndifined = np.any(x == "N/A", axis=1)
     x = x[~conditionUndifined]
-    # we need to work on columns: 0, 4, 5, 6, 9
+    y = y[~conditionUndifined]
 
+    # we need to work on columns: 0, 4, 5, 6, 9
     # column 0
     sexMapping = {"Male": 0, "Other": 1, "Female": 2}
     v_mapping = np.vectorize(lambda x: sexMapping[x])
@@ -210,23 +234,79 @@ def normalize_data(x):
 
 
 def get_trash_column(x):
-    return np.where(np.var(x, axis=0) == 0)[0]
+    return np.where(np.var(x, axis=0) <= 0.001)[0]
 
 
-def train_ovo(x, y, c, cv):
-    logreg = LogisticRegression()
-    # Create the grid search object
-    grid_search = GridSearchCV(logreg, c, cv=cv)
+def draw_cost_function(model, x_train, y_train):
+    # Retrieve the decision function values
+    decision_values = np.asarray(model.decision_function(x_train))
 
-    # Fit the grid search to the training data
-    grid_search.fit(x, y)
+    # Calculate the softmax of the decision function values
+    softmax = np.exp(decision_values) / \
+        np.sum(np.exp(decision_values), axis=0, keepdims=True)
 
-    # Make predictions on the test set using the best model
-    all_models = grid_search.cv_results_
-    best_model = grid_search.best_estimator_
-    # Print the classification report
-    report = classification_report(y, best_model.predict(x))
-    return best_model, report, grid_search
+    # Calculate the loss function values (negative log likelihood)
+    loss_values = -np.log(softmax[np.arange(len(y_train)), y_train])
+
+    # Plot the loss function values
+    plt.plot(loss_values)
+    plt.xlabel('Iterations')
+    plt.ylabel('Loss')
+    plt.title('Loss Function Progression')
+    plt.show()
+
+
+################### TRAIN FUNCTIONS START ###################
+# One vs One training
+def train_ovo(X_train, X_test, y_train, y_test, c, max_iter, degree=1):
+
+    # Add more dimensions to the model
+    if (degree > 1):
+        X_train = get_poly(degree).fit_transform(X_train)
+        X_test = get_poly(degree).fit_transform(X_test)
+
+    logreg = LogisticRegression(max_iter=max_iter, C=c)
+
+    # Create the one-vs-one classifier
+    ovo = OneVsOneClassifier(logreg)
+
+    # Train the model
+    ovo.fit(X_train, y_train)
+
+    # get precision, accuracy etc
+    report = classification_report(
+        y_test, ovo.predict(X_test), output_dict=True)
+
+    return ovo, report, logreg
+
+
+# GMM training
+def train_GMM(x_train, x_test, y_train, y_test, k):
+
+    # Create a GMM object
+    # K is the number of components/clusters
+    gmm = GaussianMixture(n_components=k)
+
+    # Fit the GMM model to your data
+    gmm.fit(x_train, y_train)
+
+    report = classification_report(y_test, gmm.predict(x_test))
+
+    return gmm, report
+
+
+def train_knn(x_train, x_test, y_train, y_test, k):
+    # Create a k-NN object
+    # k is the number of neighbors to consider
+    knn = KNeighborsClassifier(n_neighbors=k)
+
+    # Train the KNN model
+    knn.fit(x_train, y_train)
+
+    report = classification_report(y_test, knn.predict(x_test))
+
+    return knn, report
+################### TRAIN FUNCTIONS END ###################
 
 
 def compare_arrays(arr1, arr2):
@@ -241,26 +321,67 @@ def compare_arrays(arr1, arr2):
     print(table)
 
 
+def get_poly(n):
+    return PolynomialFeatures(degree=n, interaction_only=False, include_bias=False)
+
+
 if __name__ == "__main__":
 
-    # ################# heart data #################
-    # x, y = get_diabetes_data()
+    ################# heart start #################
+    # Get the data
+    x, y = get_heart_data()
 
-    # # Define the parameter grid for grid search
-    # c = {'C': [0.001, 0.01, 0.05, 0.1, 1.0, 10.0]}
+    # Split the data into training and testing sets
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y, test_size=0.3, random_state=45)
 
-    # model, report, grid_search = train_ovo(x, y, c, 5)
+    ######## One vs One using Linear Regression start ########
+    print("++++++++++ One Vs One ++++++++++")
 
-    # predicted = model.predict(x)
+    # find the best C
+    Cs = [0.01, 0.1, 1, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000]
+    recall_0, recall_1, precision_0, precision_1 = [], [], [], []
+    for c in Cs:
+        print("C = " + str(c) + ":")
+        model, report, logreg = train_ovo(
+            x_train, x_test, y_train, y_test, c, 10000, 1)
 
-    # # compare_arrays(y, predicted)
+        precision_0.append(float(report['0.0']['precision']))
+        recall_0.append(float(report['0.0']['recall']))
+        precision_1.append(float(report['1.0']['precision']))
+        recall_1.append(float(report['1.0']['recall']))
 
-    # # Print the best parameter and the corresponding score
-    # print("Best C parameter:", grid_search.best_params_['C'])
-    # print("Best score:", grid_search.best_score_)
+    plt.plot(Cs, precision_0)
+    plt.plot(Cs, recall_0)
+    plt.show()
+    plt.plot(Cs, precision_1)
+    plt.plot(Cs, recall_1)
+    plt.show()
 
-    # print(report)
+    # Draw cost function of the linear regression model for the best C
 
-    ################# heart data end #################
+    model, report, logreg = train_ovo(
+        x_train, x_test, y_train, y_test, c, 10000, 1)
 
-    sort_diabetes_once()
+    draw_cost_function(model, x_train, y_train)
+    ######## One vs One using Linear Regression end ########
+
+    ######## GMM start ########
+    print("++++++++++ GMM ++++++++++")
+    gmm, report = train_GMM(x_train, x_test, y_train, y_test, 2)
+    print(report)
+    ######## GMM end ########
+
+    ######## KNN start ########
+    print("++++++++++ KNN ++++++++++")
+    knn, report = train_knn(x_train, x_test, y_train, y_test, 500)
+    print(report)
+    ######## KNN end ########
+
+    ################# heart end #################
+
+    ################# diabetes start #################
+
+    ################# diabetes end #################
+
+# sort_diabetes_once()
