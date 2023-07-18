@@ -1,13 +1,38 @@
 from sklearn.linear_model import LogisticRegression
 from sklearn.multiclass import OneVsOneClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import classification_report
+from sklearn.model_selection import GridSearchCV
+from tabulate import tabulate
 import numpy as np
+import csv
 
+
+# This function sorts diabetes only once, since there are 
+def sort_diabetes_once():
+    data = np.loadtxt("diabetes.csv", delimiter=",", dtype=str)
+    
+    sorted_indices = np.argsort(data[:, 0])[::-1]
+
+    # Sort the matrix based on the sorted indices
+    sorted_matrix = data[sorted_indices]
+
+    # Specify the output CSV file path
+    output_file = "diabetes_sorted.csv"
+
+    # Write the sorted matrix to a CSV file
+    with open(output_file, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerows(sorted_matrix)
+    
 
 def get_diabetes_data():
-    # get the data, remove top row of column names
+    # get only a portion of the data, remove top row of column names
     data = np.loadtxt("diabetes.csv", delimiter=",", dtype=str)
+    num_rows = np.shape(data)[0]
+    random_indices = np.random.choice(num_rows, size=500, replace=False)
+    data = data[random_indices]
+
     x = data[1:, 1:]
     x = x.astype(float)
 
@@ -68,7 +93,7 @@ def get_heart_data():
     x = x.astype(float)
     y = y.astype(float)
 
-    return (normalize_data(x), normalize_data(y))
+    return (normalize_data(x), y)
 
 
 def print_unique_values_per_col(x):
@@ -121,7 +146,7 @@ def get_hypothyroid_data():
     x = np.delete(x, get_trash_column(x), 1)
 
     # return normalized data
-    return (normalize_data(x), normalize_data(y))
+    return (normalize_data(x), y)
 
 
 def get_stroke_data():
@@ -154,7 +179,7 @@ def get_stroke_data():
         "Self-employed": 3,
         "Private": 4,
     }
-    
+
     v_mapping = np.vectorize(lambda x: workMapping[x])
     x[:, 5] = v_mapping(x[:, 5])
 
@@ -164,7 +189,8 @@ def get_stroke_data():
     x[~condition_yes, 6] = 0
 
     # column 9: smoking status
-    smokeMapping = {"formerly smoked": 0, "Unknown": 1, "smokes": 2, "never smoked": 3}
+    smokeMapping = {"formerly smoked": 0,
+                    "Unknown": 1, "smokes": 2, "never smoked": 3}
     v_mapping = np.vectorize(lambda x: smokeMapping[x])
     x[:, 9] = v_mapping(x[:, 9])
 
@@ -173,10 +199,10 @@ def get_stroke_data():
 
     x = np.delete(x, get_trash_column(x), 1)
 
-    # remove id column 
+    # remove id column
     x = np.delete(x, 0, axis=1)
 
-    return (normalize_data(x), normalize_data(y))
+    return (normalize_data(x), y)
 
 
 def normalize_data(x):
@@ -187,25 +213,54 @@ def get_trash_column(x):
     return np.where(np.var(x, axis=0) == 0)[0]
 
 
-if __name__ == "__main__":
-    # print('diabets Y:{}'.format(get_diabetes_data()[1]))
-    # print('heart Y:{}'.format(get_heart_data()[1]))
-    # print('hypotyroid Y:{}'.format(get_hypothyroid_data()[1]))
-    # print('stroke Y:{}'.format(get_stroke_data()[1]))
-    x, y = get_diabetes_data()
-    X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
-
-    # Create the logistic regression model
+def train_ovo(x, y, c, cv):
     logreg = LogisticRegression()
+    # Create the grid search object
+    grid_search = GridSearchCV(logreg, c, cv=cv)
 
-    # Create the one-vs-one classifier
-    ovo = OneVsOneClassifier(logreg)
+    # Fit the grid search to the training data
+    grid_search.fit(x, y)
 
-    # Train the model
-    ovo.fit(X_train, y_train)
+    # Make predictions on the test set using the best model
+    all_models = grid_search.cv_results_
+    best_model = grid_search.best_estimator_
+    # Print the classification report
+    report = classification_report(y, best_model.predict(x))
+    return best_model, report, grid_search
 
-    # Make predictions on the test set
-    y_pred = ovo.predict(X_test)
 
-    # Evaluate the accuracy of the model
-    accuracy = accuracy_score(y_test, y_pred)
+def compare_arrays(arr1, arr2):
+    headers = ["Index", "Array 1", "Array 2", "Comparison"]
+    table_data = []
+
+    for i in range(len(arr1)):
+        comparison = "Equal" if arr1[i] == arr2[i] else "Not equal"
+        table_data.append([i, arr1[i], arr2[i], comparison])
+
+    table = tabulate(table_data, headers, tablefmt="grid")
+    print(table)
+
+
+if __name__ == "__main__":
+
+    # ################# heart data #################
+    # x, y = get_diabetes_data()
+
+    # # Define the parameter grid for grid search
+    # c = {'C': [0.001, 0.01, 0.05, 0.1, 1.0, 10.0]}
+
+    # model, report, grid_search = train_ovo(x, y, c, 5)
+
+    # predicted = model.predict(x)
+
+    # # compare_arrays(y, predicted)
+
+    # # Print the best parameter and the corresponding score
+    # print("Best C parameter:", grid_search.best_params_['C'])
+    # print("Best score:", grid_search.best_score_)
+
+    # print(report)
+
+    ################# heart data end #################
+
+    sort_diabetes_once()
