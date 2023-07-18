@@ -1,3 +1,7 @@
+from sklearn.linear_model import LogisticRegression
+from sklearn.multiclass import OneVsOneClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 import numpy as np
 
 
@@ -15,7 +19,7 @@ def get_diabetes_data():
     y = y.astype(float)
 
     # return normalized data
-    return (normalize_data(x), normalize_data(y))
+    return (normalize_data(x), y)
 
 
 def get_heart_data():
@@ -184,4 +188,24 @@ def get_trash_column(x):
 
 
 if __name__ == "__main__":
-    pass
+    # print('diabets Y:{}'.format(get_diabetes_data()[1]))
+    # print('heart Y:{}'.format(get_heart_data()[1]))
+    # print('hypotyroid Y:{}'.format(get_hypothyroid_data()[1]))
+    # print('stroke Y:{}'.format(get_stroke_data()[1]))
+    x, y = get_diabetes_data()
+    X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+
+    # Create the logistic regression model
+    logreg = LogisticRegression()
+
+    # Create the one-vs-one classifier
+    ovo = OneVsOneClassifier(logreg)
+
+    # Train the model
+    ovo.fit(X_train, y_train)
+
+    # Make predictions on the test set
+    y_pred = ovo.predict(X_test)
+
+    # Evaluate the accuracy of the model
+    accuracy = accuracy_score(y_test, y_pred)
