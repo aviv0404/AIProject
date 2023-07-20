@@ -12,13 +12,17 @@ from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.neighbors import KNeighborsClassifier
 
+# pip install matplotlib
+# pip install tabulat
+# pip install -U scikit-learn
+
 
 # This function sorts diabetes only once, since there are about 210 thousand lines
 # of healthy people without diabetes (class 0), and only about 20k of class 2 and 3k of class 1
 # This function should only be executed once, it outputs a new file sorted by the classes, and another file with indexes of where each class starts
 # We do this to save in runtime, you don't need to run this function as we've provided you with the files.
 def sort_diabetes_once():
-    data = np.loadtxt("diabetes.csv", delimiter=",", dtype=str)
+    data = np.loadtxt("Datasets/diabetes.csv", delimiter=",", dtype=str)
 
     sorted_indices = np.argsort(data[:, 0])[::-1]
 
@@ -26,33 +30,39 @@ def sort_diabetes_once():
     sorted_matrix = data[sorted_indices]
 
     # Specify the output CSV file path
-    output_file = "diabetes_sorted.csv"
-    out_index = "diabetes_sorted_index.txt"
+    output_file = "Datasets/diabetes_sorted.csv"
+    out_index = "Datasets/diabetes_sorted_index.txt"
 
     # Write the sorted matrix to a CSV file
     with open(output_file, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerows(sorted_matrix)
-    ind = [np.count_nonzero(sorted_matrix[:, 0] == '2.0'), np.count_nonzero(
-        sorted_matrix[:, 0] == '2.0')+np.count_nonzero(sorted_matrix[:, 0] == '1.0')]
+    ind = [
+        np.count_nonzero(sorted_matrix[:, 0] == "2.0"),
+        np.count_nonzero(sorted_matrix[:, 0] == "2.0")
+        + np.count_nonzero(sorted_matrix[:, 0] == "1.0"),
+    ]
     print(ind)
-    with open(out_index, 'w') as file:
-        file.write(str(ind[0]) + '\n'+str(ind))
+    with open(out_index, "w") as file:
+        file.write(str(ind[0]) + "\n" + str(ind))
     return ind
 
 
 def get_diabetes_data():
-    data = np.loadtxt("diabetes_sorted.csv", delimiter=",", dtype=str)
+    data = np.loadtxt("Datasets/diabetes_sorted.csv", delimiter=",", dtype=str)
     num_rows = np.shape(data)[0]
     indexs = []
     # Get 3000 of random from class 0, 1000 of random class 1, and 1000 of random class 2.
     # This is fine because in reality there are more healthy people than people in class 1 or 2
-    with open('diabetes_sorted_index.txt', 'r') as file:
+    with open("Datasets/diabetes_sorted_index.txt", "r") as file:
         indexs = [line.strip() for line in file.readlines()]
     for i in range(len(indexs)):
         indexs[i] = int(indexs[i])
-    class2, class1, class0 = data[np.array(random.sample([*range(1, indexs[0])], 4500))], data[np.array(random.sample(
-        [*range(indexs[0]+1, indexs[1])], 4500))], data[np.array(random.sample([*range(indexs[1], num_rows)], 4500))]
+    class2, class1, class0 = (
+        data[np.array(random.sample([*range(1, indexs[0])], 4500))],
+        data[np.array(random.sample([*range(indexs[0] + 1, indexs[1])], 4500))],
+        data[np.array(random.sample([*range(indexs[1], num_rows)], 5000))],
+    )
     data = np.concatenate((data[0:1,], class2, class1, class0), axis=0)
 
     x = data[1:, 1:]
@@ -71,7 +81,7 @@ def get_diabetes_data():
 
 def get_heart_data():
     # get the data
-    data = np.loadtxt("heart.csv", delimiter=",", dtype=str)
+    data = np.loadtxt("Datasets/heart.csv", delimiter=",", dtype=str)
     x = data[1:, :-1]
     y = data[1:, -1]
 
@@ -172,8 +182,26 @@ def get_hypothyroid_data():
     return (normalize_data(x), y)
 
 
+def get_cancer_data():
+    data = np.loadtxt("Datasets/lung_cancer.csv", delimiter=",", dtype=str)
+    x = data[1:, 2:-1]
+    y = data[1:, -1]
+
+    # turn y into 1s and -1s
+    # 1 means high likelyhood of lung cancer, -1 means low likelyhood of lung cancer
+    likelyhoodMapping = {"High": 1, "Medium": 1, "Low": -1}
+    v_mapping = np.vectorize(lambda y: likelyhoodMapping[y])
+    y = v_mapping(y)
+
+    # remove unnecessary data
+    x = x.astype(float)
+    y = y.astype(float)
+    x = np.delete(x, get_trash_column(x), 1)
+
+    return (normalize_data(x), y)
+
+
 def get_stroke_data():
-    # TODO: reformat text to number
     data = np.loadtxt("stroke.csv", delimiter=",", dtype=str)
     x = data[1:, 1:-1]
     y = data[1:, -1]
@@ -213,8 +241,7 @@ def get_stroke_data():
     x[~condition_yes, 6] = 0
 
     # column 9: smoking status
-    smokeMapping = {"formerly smoked": 0,
-                    "Unknown": 1, "smokes": 2, "never smoked": 3}
+    smokeMapping = {"formerly smoked": 0, "Unknown": 1, "smokes": 2, "never smoked": 3}
     v_mapping = np.vectorize(lambda x: smokeMapping[x])
     x[:, 9] = v_mapping(x[:, 9])
 
@@ -242,26 +269,28 @@ def draw_cost_function(model, x_train, y_train):
     decision_values = np.asarray(model.decision_function(x_train))
 
     # Calculate the softmax of the decision function values
-    softmax = np.exp(decision_values) / \
-        np.sum(np.exp(decision_values), axis=0, keepdims=True)
+    softmax = np.exp(decision_values) / np.sum(
+        np.exp(decision_values), axis=0, keepdims=True
+    )
 
     # Calculate the loss function values (negative log likelihood)
     loss_values = -np.log(softmax[np.arange(len(y_train)), y_train])
 
     # Plot the loss function values
     plt.plot(loss_values)
-    plt.xlabel('Iterations')
-    plt.ylabel('Loss')
-    plt.title('Loss Function Progression')
+    plt.xlabel("Iterations")
+    plt.ylabel("Loss")
+    plt.title("Loss Function Progression")
     plt.show()
 
 
 ################### TRAIN FUNCTIONS START ###################
-# One vs One training
-def train_ovo(X_train, X_test, y_train, y_test, c, max_iter, degree=1):
 
+
+# One vs One trainings
+def train_ovo(X_train, X_test, y_train, y_test, c, max_iter, degree=1):
     # Add more dimensions to the model
-    if (degree > 1):
+    if degree > 1:
         X_train = get_poly(degree).fit_transform(X_train)
         X_test = get_poly(degree).fit_transform(X_test)
 
@@ -275,14 +304,14 @@ def train_ovo(X_train, X_test, y_train, y_test, c, max_iter, degree=1):
 
     # get precision, accuracy etc
     report = classification_report(
-        y_test, ovo.predict(X_test), output_dict=True)
+        y_test, ovo.predict(X_test), output_dict=True, zero_division=1
+    )
 
     return ovo, report, logreg
 
 
 # GMM training
 def train_GMM(x_train, x_test, y_train, y_test, k):
-
     # Create a GMM object
     # K is the number of components/clusters
     gmm = GaussianMixture(n_components=k)
@@ -290,7 +319,7 @@ def train_GMM(x_train, x_test, y_train, y_test, k):
     # Fit the GMM model to your data
     gmm.fit(x_train, y_train)
 
-    report = classification_report(y_test, gmm.predict(x_test))
+    report = classification_report(y_test, gmm.predict(x_test), zero_division=1)
 
     return gmm, report
 
@@ -303,9 +332,11 @@ def train_knn(x_train, x_test, y_train, y_test, k):
     # Train the KNN model
     knn.fit(x_train, y_train)
 
-    report = classification_report(y_test, knn.predict(x_test))
+    report = classification_report(y_test, knn.predict(x_test), zero_division=1)
 
     return knn, report
+
+
 ################### TRAIN FUNCTIONS END ###################
 
 
@@ -325,45 +356,67 @@ def get_poly(n):
     return PolynomialFeatures(degree=n, interaction_only=False, include_bias=False)
 
 
-if __name__ == "__main__":
+def main():
+    #analyze_cancer_data()
 
-    ################# heart start #################
+    analyze_covid_data()
+
+    analyze_heart_data()
+
+    analyze_diabetes_data()
+
+
+
+def analyze_cancer_data():
+    print("--------------- Analyzing Lung Cancer Data ---------------")
     # Get the data
-    x, y = get_heart_data()
+    x, y = get_cancer_data()
 
     # Split the data into training and testing sets
     x_train, x_test, y_train, y_test = train_test_split(
-        x, y, test_size=0.3, random_state=45)
+        x, y, test_size=0.3, random_state=45
+    )
 
     ######## One vs One using Linear Regression start ########
     print("++++++++++ One Vs One ++++++++++")
 
     # find the best C
-    Cs = [0.01, 0.1, 1, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000]
+    Cs = [0.01, 0.1, 1, 2, 5, 10]
     recall_0, recall_1, precision_0, precision_1 = [], [], [], []
     for c in Cs:
-        print("C = " + str(c) + ":")
-        model, report, logreg = train_ovo(
-            x_train, x_test, y_train, y_test, c, 10000, 1)
+        model, report, logreg = train_ovo(x_train, x_test, y_train, y_test, c, 2000, 2)
 
-        precision_0.append(float(report['0.0']['precision']))
-        recall_0.append(float(report['0.0']['recall']))
-        precision_1.append(float(report['1.0']['precision']))
-        recall_1.append(float(report['1.0']['recall']))
+        precision_0.append(float(report["-1.0"]["precision"]))
+        recall_0.append(float(report["-1.0"]["recall"]))
+        precision_1.append(float(report["1.0"]["precision"]))
+        recall_1.append(float(report["1.0"]["recall"]))
 
-    plt.plot(Cs, precision_0)
-    plt.plot(Cs, recall_0)
+    # Plot recall and precision for each class
+    plt.xlabel("C")
+    plt.ylabel("Precision / Recall")
+    plt.title("One Vs One\nPrecision and Recall for different C values for class 0")
+
+    plt.plot(Cs, precision_0, label="Precision")
+    plt.plot(Cs, recall_0, label="Recall")
+
+    plt.legend()
     plt.show()
-    plt.plot(Cs, precision_1)
-    plt.plot(Cs, recall_1)
+
+    plt.xlabel("C")
+    plt.ylabel("Precision / Recall")
+    plt.title("One Vs One\nPrecision and Recall for different C values for class 1")
+
+    plt.plot(Cs, precision_1, label="Precision")
+    plt.plot(Cs, recall_1, label="Recall")
+
+    plt.legend()
     plt.show()
 
     # Draw cost function of the linear regression model for the best C
 
-    model, report, logreg = train_ovo(
-        x_train, x_test, y_train, y_test, c, 10000, 1)
+    # model, report, logreg = train_ovo(x_train, x_test, y_train, y_test, c, 10000, 1)
 
-    draw_cost_function(model, x_train, y_train)
+    # draw_cost_function(model, x_train, y_train)
     ######## One vs One using Linear Regression end ########
 
     ######## GMM start ########
@@ -374,14 +427,23 @@ if __name__ == "__main__":
 
     ######## KNN start ########
     print("++++++++++ KNN ++++++++++")
-    knn, report = train_knn(x_train, x_test, y_train, y_test, 500)
+    knn, report = train_knn(x_train, x_test, y_train, y_test, 100)
     print(report)
     ######## KNN end ########
 
-    ################# heart end #################
 
-    ################# diabetes start #################
+def analyze_covid_data():
+    return
 
-    ################# diabetes end #################
+def analyze_heart_data():
+    return
 
-# sort_diabetes_once()
+
+def analyze_diabetes_data():
+    return
+
+
+
+
+if __name__ == "__main__":
+    main()
