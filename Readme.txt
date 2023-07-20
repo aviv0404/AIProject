@@ -1,5 +1,5 @@
 source:
 diabets: https://www.kaggle.com/datasets/alexteboul/diabetes-health-indicators-dataset
 heart: https://www.kaggle.com/datasets/fedesoriano/heart-failure-prediction
-stroke: https://www.kaggle.com/datasets/fedesoriano/stroke-prediction-dataset
-hypothyroid: https://www.kaggle.com/datasets/yasserhessein/thyroid-disease-data-set
+covid: https://www.kaggle.com/datasets/meirnizri/covid19-dataset - picked randomly 10k rows from this file
+lung cancer: https://www.kaggle.com/datasets/thedevastator/cancer-patients-and-air-pollution-a-new-link
