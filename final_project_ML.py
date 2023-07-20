@@ -350,9 +350,9 @@ def train_GMM(x_train, x_test, y_train, y_test, k):
     return gmm, report
 
 
-def train_adaboost(x_train, x_test, y_train, y_test):
+def train_adaboost(x_train, x_test, y_train, y_test, num_iter):
     covidAdaModel = Adaboost(x_train, y_train)
-    covidAdaModel.fit()
+    covidAdaModel.fit(num_iter)
     report = classification_report(y_test, covidAdaModel.predict(x_test))
     return covidAdaModel, report
 
@@ -392,6 +392,7 @@ def get_poly(n):
 
 
 def main():
+    # comment out the data you don't want to analyze
     analyze_covid_data()
 
     # analyze_cancer_data()
@@ -401,11 +402,12 @@ def main():
     # analyze_diabetes_data()
 
 
+
+
 def analyze_covid_data():
     print("--------------- Analyzing Covid Data ---------------")
-    # Get the data
-    x, y = get_covid_data()
 
+    x,y = get_covid_data()
 
     # Split the data into training and testing sets
     x_train, x_test, y_train, y_test = train_test_split(
@@ -448,13 +450,12 @@ def analyze_covid_data():
     plt.plot(Cs, recall_1, label="Recall (class 1)")
 
     plt.legend()
-    # plt.show()
+    plt.show()
 
     print("The optimal C value seems to be C = 1\n")
     ######## One vs One using Linear Regression end ########
 
     ######## GMM start ########        
-
     print("\n++++++++++ GMM ++++++++++")
     print("class 0 = doesn't have covid\nclass 1 = has covid")
     print("Let's try different numbers of classes and fit the GMM for each")
@@ -467,9 +468,128 @@ def analyze_covid_data():
     plt.plot(range(1, 11), cost_values, marker="o")
     plt.xlabel("Number of classes")
     plt.ylabel("Cost function")
-    plt.title("Cost function of Gaussian Mixture Model")
+    plt.title("GMM\nCost function of Gaussian Mixture Model")
     plt.grid(True)
-    # plt.show()
+    plt.show()
+
+    print("Highest Jumps seem to be at K = 4 and K = 8. and they are all spaces pretty equally.")
+    print("Precision and Recall for K = 2:")
+
+    gmm, report = train_GMM(x_train, x_test, y_train, y_test, 2)
+    print(report)
+    ######## GMM end ########
+
+    ######## KNN start ########
+    print("++++++++++ KNN ++++++++++")
+    print("class 0 = doesn't have covid\nclass 1 = has covid")
+    print(
+        "Let's try different number of neighbors to find the optimal K based on the F1 Score"
+    )
+    Ks = [1, 2, 5, 10, 20, 50, 100, 200]
+
+    # go back go -1, 1 since KNN doesn't get confused like GMM
+    f1_scores_0 = []
+    f1_scores_1 = []
+    f1_scores_sum = []
+    for k in Ks:
+        knn, report = train_knn(x_train, x_test, y_train, y_test, k)
+        f1_scores_0.append(float(report["0.0"]["f1-score"]))
+        f1_scores_1.append(float(report["1.0"]["f1-score"]))
+        f1_scores_sum.append(f1_scores_0[-1] + f1_scores_1[-1])
+
+    # Plot recall and precision for each class
+    plt.xlabel("K")
+    plt.ylabel("F1 Score")
+    plt.title("KNN\nF1 Score for different K values for both classes")
+
+    plt.plot(Ks, f1_scores_0, label="F1 Score (class 0)")
+    plt.plot(Ks, f1_scores_1, label="F1 Score (class 1)")
+    plt.plot(Ks, f1_scores_sum, label="Sum (classes 1,0)")
+
+    plt.legend()
+    plt.show()
+
+    print("As we can see 1 <= K <= 10 gives the best results.\nPrecision and Recall for K = 1:")
+    knn, report = train_knn(x_train, x_test, y_train, y_test, 1)
+    print(report)
+    ######## KNN end ########
+
+    ######## Adaboost start ########
+
+    print("++++++++++ Adaboost ++++++++++")
+    adaboost,report = train_adaboost(x_train, x_test, y_train, y_test, 10)
+    print(report)
+
+    ######## Adaboost end ########
+
+
+def analyze_cancer_data():
+    print("--------------- Analyzing Covid Data ---------------")
+
+    x,y = get_cancer_data()
+
+    # Split the data into training and testing sets
+    x_train, x_test, y_train, y_test = train_test_split(
+        x, y, test_size=0.3, random_state=45
+    )
+
+    # turn -1 to 0. it means the same thing, we're doing this
+    # because otherwise GMM thinks there are 3 classes and it messes up the report
+    # the -1s are for Adaboost
+    y_train[y_train == -1.0] = 0
+    y_test[y_test == -1.0] = 0
+
+    ######## One vs One start ########
+    print("++++++++++ One Vs One ++++++++++")
+    print(
+        "You should see Precision and Recall for the different C values plotted in a graph"
+    )
+
+    # find the best C for one vs all (the c is the complication constant)
+    Cs = [0.01, 0.1, 1, 2, 5, 10]
+    recall_0, recall_1, precision_0, precision_1 = [], [], [], []
+    for c in Cs:
+        model, report, logreg = train_ovo(x_train, x_test, y_train, y_test, c, 2000, 1)
+
+        precision_0.append(float(report["0.0"]["precision"]))
+        recall_0.append(float(report["0.0"]["recall"]))
+        precision_1.append(float(report["1.0"]["precision"]))
+        recall_1.append(float(report["1.0"]["recall"]))
+
+    # Plot recall and precision for each class
+    plt.xlabel("C")
+    plt.ylabel("Precision / Recall")
+    plt.title(
+        "One Vs One\nPrecision and Recall for different C values for both classes"
+    )
+
+    plt.plot(Cs, precision_0, label="Precision (class 0)")
+    plt.plot(Cs, recall_0, label="Recall (class 0)")
+    plt.plot(Cs, precision_1, label="Precision (class 1)")
+    plt.plot(Cs, recall_1, label="Recall (class 1)")
+
+    plt.legend()
+    plt.show()
+
+    print("The optimal C value seems to be C >= 2\n")
+    ######## One vs One using Linear Regression end ########
+
+    ######## GMM start ########        
+    print("\n++++++++++ GMM ++++++++++")
+    print("class 0 = doesn't have covid\nclass 1 = has covid")
+    print("Let's try different numbers of classes and fit the GMM for each")
+
+    cost_values = []
+    for k in range(1, 11):
+        gmm, report = train_GMM(x_train, x_test, y_train, y_test, k)
+        cost_values.append(gmm.score(x_train))
+
+    plt.plot(range(1, 11), cost_values, marker="o")
+    plt.xlabel("Number of classes")
+    plt.ylabel("Cost function")
+    plt.title("GMM\nCost function of Gaussian Mixture Model")
+    plt.grid(True)
+    plt.show()
 
     print("\nAs we can see the best K is K = 2 (as expected)")
     print("Precision and Recall for K = 2:")
@@ -506,24 +626,17 @@ def analyze_covid_data():
     plt.plot(Ks, f1_scores_sum, label="Sum (classes 1,0)")
 
     plt.legend()
-    # plt.show()
-
-    print("The optimal K value seems to be K = 50\n")
-
+    plt.show()
     ######## KNN end ########
 
     ######## Adaboost start ########
 
     print("++++++++++ Adaboost ++++++++++")
-    adaboost, report = train_adaboost(x_train, x_test, y_train, y_test)
+    adaboost, report = train_adaboost(x_train, x_test, y_train, y_test, 10)
 
     print(report)
 
     ######## Adaboost end ########
-
-
-def analyze_cancer_data():
-    return
 
 
 def analyze_heart_data():

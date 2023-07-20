@@ -54,18 +54,13 @@ class Adaboost:
                 models.append(
                     Stump(i, value=val, greater_than=LESS_THAN, equals=NOT_EQUALS)
                 )
-        """"
-        for m in models:
-            print(m.to_string())
-        print('num of models: {}'.format(len(models)))
-        """
+        
         i = 0
         error_score = []
         while self.stop_condition(i, max_iter, min_cost_value, self.cost_function(w)):
             costs = []
             for model in models:
                 costs.append(self.loss_function_stump(model, w))
-            print(costs)
             best_model_index = np.argmin(costs)
             self.H.append(models[best_model_index])
             self.alpha.append(
@@ -73,9 +68,10 @@ class Adaboost:
             )
             exact = self.y == self.predict(self.x)
             mistake = self.y != self.predict(self.x)
-            error_score.append(self.cost_function(self.x))
-            w[exact] = 0.5 * w[exact] * ((1 - error_score[-1])**(-1)) if error_score[-1] != 1 else w[exact]
-            w[mistake] = (0.5 * w[mistake] * ((error_score))**(-1)) if error_score[-1] != 0 else w[mistake]        
+            error_score.append(self.cost_function(w))
+            w[exact] *= ((2*(1 - error_score[-1]))**(-1))
+            w[mistake] *= ((2*(error_score[-1]))**(-1))            
+                    
             i += 1
 
     def stop_condition(self, i, max_iter, min_cost_value, current_cost_value):
@@ -100,5 +96,6 @@ class Adaboost:
     def cost_function(self, w):
         cost = 0
         for weight, real, predicted in zip(w, self.y, self.predict(self.x)):
-            cost += weight if real == predicted else 0
+            if real != predicted:
+                cost += weight
         return cost
