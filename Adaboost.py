@@ -29,6 +29,9 @@ class Stump:
                 return 1 if x[self.attributesIndex] > self.value else -1
             else:
                 return 1 if x[self.attributesIndex] < self.value else -1
+            
+    def to_string(self):
+        return 'attr ind:{}\tval: {}\tgreater than?{}'.format(self.attributesIndex, self.value, self.greater_than)
 
 
 class Adaboost:
@@ -44,19 +47,25 @@ class Adaboost:
         w = np.full(self.m, 1 / self.m)
         models = []
         for i in range(len(self.x[0])):
-            for val in set(self.x[i,]):
+            for val in set(self.x[i, ]):
                 models.append(
                     Stump(i, value=val, greater_than=GREATER_THAN, equals=EQUALS)
                 )
                 models.append(
-                    Stump(i, value=val, greater_than=GREATER_THAN, equals=EQUALS)
+                    Stump(i, value=val, greater_than=LESS_THAN, equals=NOT_EQUALS)
                 )
-        i, current_cost_value, acc = 0, 100, []
-        while self.stop_condition(i, max_iter, min_cost_value, current_cost_value):
-            error_score = self.m
+        """"
+        for m in models:
+            print(m.to_string())
+        print('num of models: {}'.format(len(models)))
+        """
+        i = 0
+        error_score = []
+        while self.stop_condition(i, max_iter, min_cost_value, self.cost_function(w)):
             costs = []
             for model in models:
                 costs.append(self.loss_function_stump(model, w))
+            print(costs)
             best_model_index = np.argmin(costs)
             self.H.append(models[best_model_index])
             self.alpha.append(
@@ -64,8 +73,9 @@ class Adaboost:
             )
             exact = self.y == self.predict(self.x)
             mistake = self.y != self.predict(self.x)
-            w[exact] = 0.5 * w[exact] * (1 - self.cost_function(w[exact]))
-            w[mistake] = 0.5 * w[mistake] * (self.cost_function(w[mistake]))
+            error_score.append(self.cost_function(self.x))
+            w[exact] = 0.5 * w[exact] * ((1 - error_score[-1])**(-1)) if error_score[-1] != 1 else w[exact]
+            w[mistake] = (0.5 * w[mistake] * ((error_score))**(-1)) if error_score[-1] != 0 else w[mistake]        
             i += 1
 
     def stop_condition(self, i, max_iter, min_cost_value, current_cost_value):
@@ -76,7 +86,7 @@ class Adaboost:
         for i, row in enumerate(self.x):
             if stump.predict(row) != self.y[i]:
                 cost += w[i]
-        return np.array(cost)
+        return cost
 
     def predict(self, x):
         y = []
