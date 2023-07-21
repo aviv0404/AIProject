@@ -351,8 +351,13 @@ def train_GMM(x_train, x_test, y_train, y_test, k):
 
 
 def train_adaboost(x_train, x_test, y_train, y_test, num_iter):
+    models = [train_GMM(x_train, x_test, y_train, y_test, 2)[0], train_knn(x_train, x_test, y_train, y_test, 2)[0]]
+    Cs, degrees = [10**-3, 10**-2, 10**-1, 1, 10, 10**2], [1, 2, 3]
+    for c in Cs:
+        for degree in degrees:
+            models.append(train_ovo(x_train, x_test, y_train, y_test, c, 100, degree)[0])
     covidAdaModel = Adaboost(x_train, y_train)
-    covidAdaModel.fit(num_iter)
+    covidAdaModel.fit(num_iter, models=models)
     report = classification_report(y_test, covidAdaModel.predict(x_test))
     return covidAdaModel, report
 

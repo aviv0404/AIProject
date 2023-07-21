@@ -43,9 +43,8 @@ class Adaboost:
         self.H = []
         self.alpha = []
 
-    def fit(self, max_iter=1000, min_cost_value=10 ** (-4)):
+    def fit(self, max_iter=1000, min_cost_value=10 ** (-4), models=[]):
         w = np.full(self.m, 1 / self.m)
-        models = []
         for i in range(len(self.x[0])):
             for val in set(self.x[i, ]):
                 models.append(
@@ -60,12 +59,13 @@ class Adaboost:
         while self.stop_condition(i, max_iter, min_cost_value, self.cost_function(w)):
             costs = []
             for model in models:
-                costs.append(self.loss_function_stump(model, w))
+                costs.append(self.loss_function_model(model, w))
             best_model_index = np.argmin(costs)
+            if costs[best_model_index] <= 0.5:
+                break
             self.H.append(models[best_model_index])
             self.alpha.append(
-                0.5 * np.log((1 - costs[best_model_index]) / costs[best_model_index])
-            )
+                0.5 * np.log((1 - costs[best_model_index]) / costs[best_model_index]))
             exact = self.y == self.predict(self.x)
             mistake = self.y != self.predict(self.x)
             error_score.append(self.cost_function(w))
@@ -77,14 +77,16 @@ class Adaboost:
     def stop_condition(self, i, max_iter, min_cost_value, current_cost_value):
         return True if max_iter > i and current_cost_value > min_cost_value else False
 
-    def loss_function_stump(self, stump, w):
+    def loss_function_model(self, model, w):
         cost = 0
         for i, row in enumerate(self.x):
-            if stump.predict(row) != self.y[i]:
+            if model.predict(row.reshape(1, -1)) != self.y[i]:
                 cost += w[i]
         return cost
 
     def predict(self, x):
+        if len(self.H) == 0:
+            raise RuntimeError
         y = []
         for row in x:
             avg = 0
@@ -94,6 +96,8 @@ class Adaboost:
         return np.array(y)
 
     def cost_function(self, w):
+        if len(self.H) == 0:
+            return 1000
         cost = 0
         for weight, real, predicted in zip(w, self.y, self.predict(self.x)):
             if real != predicted:
