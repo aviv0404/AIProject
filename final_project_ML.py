@@ -402,11 +402,11 @@ def get_poly(n):
 
 def main():
     # comment out the data you don't want to analyze
-    # analyze_covid_data()
+    analyze_covid_data()
 
     # analyze_cancer_data()
 
-    analyze_heart_data()
+    # analyze_heart_data()
 
     # analyze_diabetes_data()
 
@@ -439,7 +439,7 @@ def analyze_covid_data():
     Cs = [0.01, 0.1, 1, 2, 5, 10]
     recall_0, recall_1, precision_0, precision_1 = [], [], [], []
     for c in Cs:
-        model, report, logreg = train_ovo(x_train, x_test, y_train, y_test, c, 2000, 1)
+        onevsone, report, logreg = train_ovo(x_train, x_test, y_train, y_test, c, 2000, 1)
 
         precision_0.append(float(report["0.0"]["precision"]))
         recall_0.append(float(report["0.0"]["recall"]))
@@ -459,10 +459,14 @@ def analyze_covid_data():
     plt.plot(Cs, recall_1, label="Recall (class 1)")
 
     plt.legend()
-    # plt.show()
+    plt.show()
 
-    print("The optimal C value seems to be C = 1\n")
-    ######## One vs One using Linear Regression end ########
+    print("The optimal C value seems to be C = 1")
+    print("Precision, Recall for C = 1:")
+    onevsone, report, logreg = train_ovo(x_train, x_test, y_train, y_test, 1, 2000, 1)
+    print(report)
+
+    ######## One vs One end ########
 
     ######## GMM start ########        
     print("\n++++++++++ GMM ++++++++++")
@@ -479,7 +483,7 @@ def analyze_covid_data():
     plt.ylabel("Cost function")
     plt.title("GMM\nCost function of Gaussian Mixture Model")
     plt.grid(True)
-    # plt.show()
+    plt.show()
 
     print("Highest Jumps seem to be at K = 4 and K = 8. and they are all spaces pretty equally.")
     print("Precision and Recall for K = 2:")
@@ -516,7 +520,7 @@ def analyze_covid_data():
     plt.plot(Ks, f1_scores_sum, label="Sum (classes 1,0)")
 
     plt.legend()
-    # plt.show()
+    plt.show()
 
     print("As we can see 1 <= K <= 10 gives the best results.\nPrecision and Recall for K = 1:")
     knn, report = train_knn(x_train, x_test, y_train, y_test, 1)
@@ -525,8 +529,8 @@ def analyze_covid_data():
 
     ######## Adaboost start ########
 
-    print("++++++++++ Adaboost ++++++++++")
-    adaboost,report = train_adaboost(x_train, x_test, y_train, y_test, 10)
+    print("\n++++++++++ Adaboost ++++++++++")
+    adaboost,report = train_adaboost(x_train, x_test, y_train, y_test, 10, [onevsone, gmm, knn])
     print(report)
 
     ######## Adaboost end ########
@@ -578,7 +582,7 @@ def analyze_cancer_data():
     plt.plot(Cs, recall_1, label="Recall (class 1)")
 
     plt.legend()
-    # plt.show()
+    plt.show()
 
     print("The optimal C value seems to be C >= 2\n")
     ######## One vs One using Linear Regression end ########
