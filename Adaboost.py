@@ -1,4 +1,6 @@
 import numpy as np
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.multiclass import OneVsOneClassifier
 
 GREATER_THAN = True
 LESS_THAN = False
@@ -7,18 +9,14 @@ NOT_EQUALS = False
 
 
 class Stump:
-    attributesIndex = -1
-    value = -1
-    greater_than = GREATER_THAN
-    equals = EQUALS
-
     def __init__(self, attributeIndex, value, greater_than=GREATER_THAN, equals=EQUALS):
         self.attributesIndex = attributeIndex
         self.value = value
         self.greater_than = greater_than
         self.equals = equals
-
+        self.n_features_in_ = 1 
     def predict(self, x):
+        x = x[0]
         if self.equals:
             if self.greater_than:
                 return 1 if x[self.attributesIndex] >= self.value else -1
@@ -78,8 +76,11 @@ class Adaboost:
         return True if max_iter > i and current_cost_value > min_cost_value else False
 
     def loss_function_model(self, model, w):
+        x = self.x
+        if len(x[0]) < model.n_features_in_:
+            x = get_poly_x(model, x)
         cost = 0
-        for i, row in enumerate(self.x):
+        for i, row in enumerate(x):
             if model.predict(row.reshape(1, -1)) != self.y[i]:
                 cost += w[i]
         return cost
@@ -91,7 +92,8 @@ class Adaboost:
         for row in x:
             avg = 0
             for model, fact in zip(self.H, self.alpha):
-                avg += fact * model.predict(row)
+                row_reshaped = get_poly_x(model, row)
+                avg += fact * model.predict(row_reshaped)
             y.append(1 if avg > 0 else -1)
         return np.array(y)
 
@@ -103,3 +105,17 @@ class Adaboost:
             if real != predicted:
                 cost += weight
         return cost
+
+
+def get_poly_x(model, x):
+    model_features = model.n_features_in_
+    x_poly = x 
+    i = 1
+    while len(x_poly[0]) < model_features:
+        x_poly = get_poly_n(i).fit_transform(x)
+        i += 1
+    return x_poly
+
+
+def get_poly_n(n):
+    return PolynomialFeatures(degree=n, interaction_only=False, include_bias=False)
