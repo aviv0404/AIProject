@@ -14,7 +14,7 @@ class Stump:
         self.value = value
         self.greater_than = greater_than
         self.equals = equals
-        self.n_features_in_ = 1 
+        self.n_features_in_ = 1
     def predict(self, x):
         x = x[0]
         if self.equals:
@@ -59,7 +59,7 @@ class Adaboost:
             for model in models:
                 costs.append(self.loss_function_model(model, w))
             best_model_index = np.argmin(costs)
-            if costs[best_model_index] <= 0.5:
+            if costs[best_model_index] >= 0.5:
                 break
             self.H.append(models[best_model_index])
             self.alpha.append(
@@ -87,13 +87,26 @@ class Adaboost:
 
     def predict(self, x):
         if len(self.H) == 0:
-            raise RuntimeError
+            # we're avoiding tryign to create a new error type, 
+            # this will raise if adaboost doesn't have a model
+            raise UnicodeError 
         y = []
-        for row in x:
+        # we want to set all features in all models to be equal
+        # so get all unique models with different number of features:
+        Ns = set(model.n_features_in_ for model in self.H)
+        dif_models = []
+        while len(Ns) > 0:
+            for model in self.H:
+                if model.n_features_in_ in Ns:
+                    dif_models.append(model)
+                    Ns.remove(model.n_features_in_)
+
+        X = [get_poly_x(model, x) for model in dif_models]
+        for i in range(len(x)):
             avg = 0
             for model, fact in zip(self.H, self.alpha):
-                row_reshaped = get_poly_x(model, row)
-                avg += fact * model.predict(row_reshaped)
+                row_reshaped = X[choose_n(model, X)][i, ]
+                avg += fact * model.predict(row_reshaped.reshape(1,-1))
             y.append(1 if avg > 0 else -1)
         return np.array(y)
 
@@ -119,3 +132,9 @@ def get_poly_x(model, x):
 
 def get_poly_n(n):
     return PolynomialFeatures(degree=n, interaction_only=False, include_bias=False)
+
+def choose_n(model, X):
+    for i,x in enumerate(X):
+        if len(x[0]) == model.n_features_in_:
+            return i
+    return -1
