@@ -41,26 +41,30 @@ class Adaboost:
         self.H = []
         self.alpha = []
 
-    def fit(self, max_iter=1000, min_cost_value=10 ** (-4), models=[]):
+    def fit(self, max_iter=1000, min_cost_value=10 ** (-4), models=[], use_stump=True):
         w = np.full(self.m, 1 / self.m)
-        for i in range(len(self.x[0])):
-            for val in set(self.x[i, ]):
-                models.append(
-                    Stump(i, value=val, greater_than=GREATER_THAN, equals=EQUALS)
-                )
-                models.append(
-                    Stump(i, value=val, greater_than=LESS_THAN, equals=NOT_EQUALS)
-                )
-        
+        if use_stump:
+            for i in range(len(self.x[0])):
+                for val in set(self.x[i, ]):
+                    models.append(
+                        Stump(i, value=val, greater_than=GREATER_THAN, equals=EQUALS)
+                    )
+                    models.append(
+                        Stump(i, value=val, greater_than=LESS_THAN, equals=NOT_EQUALS)
+                    )
+
         i = 0
+        last_cost = 1.5
         error_score = []
         while self.stop_condition(i, max_iter, min_cost_value, self.cost_function(w)):
             costs = []
             for model in models:
                 costs.append(self.loss_function_model(model, w))
             best_model_index = np.argmin(costs)
-            if costs[best_model_index] >= 0.5:
+            print("Current cost: " + str(costs[best_model_index]))
+            if costs[best_model_index] >= 0.5 or last_cost-costs[best_model_index] < 10**-3:
                 break
+            last_cost = costs[best_model_index]
             self.H.append(models[best_model_index])
             self.alpha.append(
                 0.5 * np.log((1 - costs[best_model_index]) / costs[best_model_index]))
