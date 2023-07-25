@@ -68,6 +68,8 @@ class Adaboost:
             self.H.append(models[best_model_index])
             self.alpha.append(
                 0.5 * np.log((1 - costs[best_model_index]) / costs[best_model_index]))
+            
+            # adjust weights
             exact = self.y == self.predict(self.x)
             mistake = self.y != self.predict(self.x)
             error_score.append(self.cost_function(w))
